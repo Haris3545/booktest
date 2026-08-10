@@ -20,8 +20,8 @@ interface Suggestion {
   title: string;
   author: string;
   reason: string;
-  coverUrl?: string | null;
-  openLibraryUrl?: string | null;
+  bookId?: string | null;
+  shelfId?: string | null;
 }
 
 export default function SearchPage() {
@@ -31,7 +31,6 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResult[] | null>(null);
   const [recommendation, setRecommendation] = useState<{
     fromLibrary: Suggestion[];
-    suggestions: Suggestion[];
   } | null>(null);
 
   async function runLibrarySearch(q: string) {
@@ -50,7 +49,7 @@ export default function SearchPage() {
       body: JSON.stringify({ query: q }),
     });
     const data = await res.json();
-    setRecommendation(res.ok ? data : { fromLibrary: [], suggestions: [] });
+    setRecommendation(res.ok ? data : { fromLibrary: [] });
     setLoading(false);
   }
 
@@ -156,69 +155,47 @@ function LibraryResults({ results }: { results: SearchResult[] }) {
 function SuggestResults({
   recommendation,
 }: {
-  recommendation: { fromLibrary: Suggestion[]; suggestions: Suggestion[] };
+  recommendation: { fromLibrary: Suggestion[] };
 }) {
-  const { fromLibrary, suggestions } = recommendation;
+  const { fromLibrary } = recommendation;
 
-  if (fromLibrary.length === 0 && suggestions.length === 0) {
-    return <p className="text-muted text-center py-6">No luck finding something. Try rephrasing.</p>;
+  if (fromLibrary.length === 0) {
+    return (
+      <p className="text-muted text-center py-6">
+        Nothing on your shelves fits that yet. Try rephrasing, or scan more books in.
+      </p>
+    );
   }
 
   return (
-    <div className="space-y-8">
-      {fromLibrary.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-accent uppercase tracking-wide mb-3">
-            Already on your shelf
-          </h2>
-          <div className="space-y-2">
-            {fromLibrary.map((s) => (
-              <div key={s.title} className="bg-surface border border-accent/30 rounded-2xl p-4">
-                <p className="font-medium">{s.title}</p>
-                <p className="text-sm text-muted mb-1">{s.author}</p>
-                <p className="text-sm">{s.reason}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {suggestions.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">
-            You might like
-          </h2>
-          <div className="space-y-2">
-            {suggestions.map((s) => (
-              <div key={s.title} className="flex gap-3 bg-surface border border-border rounded-2xl p-4">
-                {s.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={s.coverUrl} alt="" className="w-12 h-16 object-cover rounded shrink-0" />
-                ) : (
-                  <div className="w-12 h-16 bg-background rounded flex items-center justify-center text-xl shrink-0">
-                    📖
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <p className="font-medium">{s.title}</p>
-                  <p className="text-sm text-muted mb-1">{s.author}</p>
-                  <p className="text-sm mb-1">{s.reason}</p>
-                  {s.openLibraryUrl && (
-                    <a
-                      href={s.openLibraryUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm text-accent font-medium"
-                    >
-                      How to get it →
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-    </div>
+    <section>
+      <h2 className="text-sm font-semibold text-accent uppercase tracking-wide mb-3">
+        From your shelves
+      </h2>
+      <div className="space-y-2">
+        {fromLibrary.map((s) => {
+          const content = (
+            <>
+              <p className="font-medium">{s.title}</p>
+              <p className="text-sm text-muted mb-1">{s.author}</p>
+              <p className="text-sm">{s.reason}</p>
+            </>
+          );
+          return s.shelfId ? (
+            <Link
+              key={s.title}
+              href={`/shelf/${s.shelfId}${s.bookId ? `?book=${s.bookId}` : ""}`}
+              className="block bg-surface border border-accent/30 rounded-2xl p-4"
+            >
+              {content}
+            </Link>
+          ) : (
+            <div key={s.title} className="bg-surface border border-accent/30 rounded-2xl p-4">
+              {content}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

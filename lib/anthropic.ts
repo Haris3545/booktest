@@ -113,18 +113,17 @@ export interface RecommendationSuggestion {
   reason: string;
 }
 
-const RECOMMEND_SYSTEM_PROMPT = `You are a friendly, well-read librarian helping someone find a book. Given a natural-language request (a mood, topic, or vague description) and a list of that person's own catalogued books (title/author), respond with ONLY a JSON object (no prose, no markdown fences) of this shape:
+const RECOMMEND_SYSTEM_PROMPT = `You are a friendly, well-read librarian helping someone find a book from their own home library. Given a natural-language request (a mood, topic, or vague description) and a list of that person's own catalogued books (title/author), respond with ONLY a JSON object (no prose, no markdown fences) of this shape:
 
-{"fromLibrary": [{"title": string, "author": string, "reason": string}], "suggestions": [{"title": string, "author": string, "reason": string}]}
+{"fromLibrary": [{"title": string, "author": string, "reason": string}]}
 
-"fromLibrary" should only include books that are genuinely good matches for the request, pulled from the provided catalog list (empty array if nothing fits well). "suggestions" should be 3-5 real, existing books (not from their catalog) that match the request well, each with a one-sentence "reason" explaining why it fits. Keep reasons short, warm, and specific.`;
+Only include books that are genuinely good matches for the request, pulled from the provided catalog list (empty array if nothing fits well — do not force weak matches). Keep reasons short, warm, and specific to why that book fits the request.`;
 
 export async function recommendBooks(
   query: string,
   catalog: { title: string; author: string | null }[]
 ): Promise<{
   fromLibrary: RecommendationSuggestion[];
-  suggestions: RecommendationSuggestion[];
 }> {
   const anthropic = anthropicClient();
   const catalogText = catalog
@@ -146,7 +145,7 @@ export async function recommendBooks(
 
   const textBlock = message.content.find((block) => block.type === "text");
   if (!textBlock || textBlock.type !== "text") {
-    return { fromLibrary: [], suggestions: [] };
+    return { fromLibrary: [] };
   }
 
   try {
@@ -156,9 +155,8 @@ export async function recommendBooks(
     const parsed = JSON.parse(trimmed.slice(start, end + 1));
     return {
       fromLibrary: Array.isArray(parsed.fromLibrary) ? parsed.fromLibrary : [],
-      suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
     };
   } catch {
-    return { fromLibrary: [], suggestions: [] };
+    return { fromLibrary: [] };
   }
 }

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { recommendBooks } from "@/lib/anthropic";
-import { bestOpenLibraryMatch } from "@/lib/openlibrary";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -12,11 +11,14 @@ export async function POST(request: Request) {
   }
 
   const supabase = supabaseServer();
-  const { data: catalog } = await supabase.from("books").select("title, author");
+  const { data: catalog } = await supabase.from("books").select("*");
 
   let result;
   try {
-    result = await recommendBooks(query, catalog ?? []);
+    result = await recommendBooks(
+      query,
+      (catalog ?? []).map((b) => ({ title: b.title, author: b.author }))
+    );
   } catch (err) {
     return NextResponse.json(
       { error: `Recommendation failed: ${(err as Error).message}` },
@@ -24,19 +26,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const suggestionsWithLinks = await Promise.all(
-    result.suggestions.map(async (s) => {
-      const match = await bestOpenLibraryMatch(s.title, s.author);
-      return {
-        ...s,
-        coverUrl: match?.coverUrl ?? null,
-        openLibraryUrl: match ? `https://openlibrary.org${match.key}` : null,
-      };
-    })
-  );
-
-  return NextResponse.json({
-    fromLibrary: result.fromLibrary,
-    suggestions: suggestionsWithLinks,
+  // Attach the actual catalog row (and therefore shelf id) to each match so
+  // the client can deep-link straight to where the book lives.
+  const fromLibrary = result.fromLibrary.map((s) => {
+    const match = (catalog ?? []).find(
+      (b) => b.title.toLowerCase() === s.title.toLowerCase()
+    );
+    return { ...s, bookId: match?.id ?? null, shelfId: match?.shelf_id ?? null };
   });
+
+  return NextResponse.json({ fromLibrary });
 }
